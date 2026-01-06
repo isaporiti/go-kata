@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 
@@ -20,9 +21,11 @@ func main() {
 	orders := NewOrderService()
 	orders.orders.Store(profileId, 5)
 
+	logger := NewStdOutLogger()
 	aggregator := NewUserAggregator(
 		profiles,
 		orders,
+		WithLogger(logger),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -35,14 +38,23 @@ func main() {
 		)
 	}
 
-	slog.Info("aggregation generated successfully",
+	logger.Info("aggregation generated successfully",
 		"Aggregation", aggregation,
+	)
+}
+
+func NewStdOutLogger() *slog.Logger {
+	return slog.New(
+		slog.NewTextHandler(
+			os.Stdout, nil,
+		),
 	)
 }
 
 type UserAggregator struct {
 	profiles *profileService
 	orders   *orderService
+	logger   *slog.Logger
 	timeout  time.Duration
 }
 
@@ -59,6 +71,17 @@ func WithTimeout(t time.Duration) userAggregatorOption {
 	}
 }
 
+func WithLogger(logger *slog.Logger) userAggregatorOption {
+	return func(a *UserAggregator) error {
+		if logger == nil {
+			return errors.New("logger can't be nil")
+		}
+
+		a.logger = logger
+		return nil
+	}
+}
+
 func NewUserAggregator(
 	profiles *profileService,
 	orders *orderService,
@@ -68,6 +91,7 @@ func NewUserAggregator(
 		profiles: profiles,
 		orders:   orders,
 		timeout:  0,
+		logger:   NewStdOutLogger(),
 	}
 	for _, opt := range options {
 		opt(aggregator)
@@ -107,6 +131,10 @@ func (a *UserAggregator) Aggregate(ctx context.Context, id int) (string, error) 
 		return nil
 	})
 	if err := eg.Wait(); err != nil {
+		a.logger.Error("could not aggregate user",
+			"ProfileId", id,
+			"Error", err,
+		)
 		return "", fmt.Errorf("an error occurred while aggregating user: %s", err)
 	}
 
