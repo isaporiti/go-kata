@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -42,21 +43,51 @@ func main() {
 type UserAggregator struct {
 	profiles *profileService
 	orders   *orderService
+	timeout  time.Duration
 }
 
-func NewUserAggregator(profiles *profileService, orders *orderService) *UserAggregator {
-	return &UserAggregator{
-		profiles,
-		orders,
+type userAggregatorOption func(a *UserAggregator) error
+
+func WithTimeout(t time.Duration) userAggregatorOption {
+	return func(a *UserAggregator) error {
+		if t <= 0 {
+			return errors.New("timeout must be greater than 0")
+		}
+
+		a.timeout = t
+		return nil
 	}
+}
+
+func NewUserAggregator(
+	profiles *profileService,
+	orders *orderService,
+	options ...userAggregatorOption,
+) *UserAggregator {
+	aggregator := &UserAggregator{
+		profiles: profiles,
+		orders:   orders,
+		timeout:  0,
+	}
+	for _, opt := range options {
+		opt(aggregator)
+	}
+	return aggregator
 }
 
 func (a *UserAggregator) Aggregate(ctx context.Context, id int) (string, error) {
 	var (
 		eg      errgroup.Group
+		cancel  context.CancelFunc
 		profile profile
 		orders  orders
 	)
+
+	if a.timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, a.timeout)
+		defer cancel()
+	}
+
 	eg.Go(func() error {
 		p, err := a.profiles.GetProfile(ctx, id)
 		if err != nil {
