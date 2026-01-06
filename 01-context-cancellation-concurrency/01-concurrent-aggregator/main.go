@@ -32,7 +32,7 @@ func main() {
 
 	aggregation, err := aggregator.Aggregate(ctx, profileId)
 	if err != nil {
-		slog.Error("could not aggregate user",
+		logger.Error("could not aggregate user",
 			"Id", profileId,
 			"Error", err,
 		)
@@ -110,12 +110,15 @@ func (a *UserAggregator) Aggregate(ctx context.Context, id int) (string, error) 
 
 	if a.timeout > 0 {
 		ctx, cancel = context.WithTimeout(ctx, a.timeout)
-		defer cancel()
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
 	}
+	defer cancel()
 
 	eg.Go(func() error {
 		p, err := a.profiles.GetProfile(ctx, id)
 		if err != nil {
+			cancel()
 			return err
 		}
 
@@ -125,6 +128,7 @@ func (a *UserAggregator) Aggregate(ctx context.Context, id int) (string, error) 
 	eg.Go(func() error {
 		o, err := a.orders.GetOrders(ctx, id)
 		if err != nil {
+			cancel()
 			return err
 		}
 
@@ -157,6 +161,12 @@ func NewProfileService() *profileService {
 }
 
 func (p *profileService) GetProfile(ctx context.Context, id int) (profile, error) {
+	select {
+	case <-ctx.Done():
+		return profile{}, ctx.Err()
+	default:
+	}
+
 	if load, ok := p.profiles.Load(id); ok {
 		if name, ok := load.(string); ok {
 			return profile{name}, nil
@@ -178,6 +188,12 @@ func NewOrderService() *orderService {
 }
 
 func (o *orderService) GetOrders(ctx context.Context, profileId int) (orders, error) {
+	select {
+	case <-ctx.Done():
+		return orders{}, ctx.Err()
+	case <-time.After(10 * time.Second):
+	}
+
 	if load, ok := o.orders.Load(profileId); ok {
 		if quantity, ok := load.(int); ok {
 			return orders{quantity}, nil
