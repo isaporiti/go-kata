@@ -13,13 +13,11 @@ import (
 )
 
 func main() {
-	profileId := 1
-
 	profiles := NewProfileService()
-	profiles.profiles.Store(profileId, "Alice")
+	profiles.profiles.Store(1, "Alice")
 
 	orders := NewOrderService()
-	orders.orders.Store(profileId, 5)
+	orders.orders.Store(1, 5)
 
 	logger := NewStdOutLogger()
 	aggregator := NewUserAggregator(
@@ -30,18 +28,47 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	aggregation, err := aggregator.Aggregate(ctx, profileId)
-	if err != nil {
-		logger.Error("could not aggregate user",
-			"Id", profileId,
-			"Error", err,
+	// happy path
+	{
+		profileId := 1
+		logger.Info("requesting user aggregation",
+			"ProfileId", profileId,
 		)
-		return
+		aggregation, err := aggregator.Aggregate(ctx, profileId)
+		if err != nil {
+			logger.Error("could not aggregate user",
+				"Id", profileId,
+				"Error", err,
+			)
+			return
+		}
+
+		logger.Info("aggregation generated successfully",
+			"ProfileId", profileId,
+			"Aggregation", aggregation,
+		)
 	}
 
-	logger.Info("aggregation generated successfully",
-		"Aggregation", aggregation,
-	)
+	// unhappy path
+	{
+		profileId := -1
+		logger.Info("requesting user aggregation",
+			"ProfileId", profileId,
+		)
+		aggregation, err := aggregator.Aggregate(ctx, profileId)
+		if err != nil {
+			logger.Error("could not aggregate user",
+				"Id", profileId,
+				"Error", err,
+			)
+			return
+		}
+
+		logger.Info("aggregation generated successfully",
+			"ProfileId", profileId,
+			"Aggregation", aggregation,
+		)
+	}
 }
 
 func NewStdOutLogger() *slog.Logger {
@@ -191,7 +218,7 @@ func (o *orderService) GetOrders(ctx context.Context, profileId int) (orders, er
 	select {
 	case <-ctx.Done():
 		return orders{}, ctx.Err()
-	case <-time.After(10 * time.Second):
+	case <-time.After(5 * time.Second):
 	}
 
 	if load, ok := o.orders.Load(profileId); ok {
