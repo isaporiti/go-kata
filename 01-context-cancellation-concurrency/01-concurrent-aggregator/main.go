@@ -36,6 +36,7 @@ func main() {
 			"Id", profileId,
 			"Error", err,
 		)
+		return
 	}
 
 	logger.Info("aggregation generated successfully",
