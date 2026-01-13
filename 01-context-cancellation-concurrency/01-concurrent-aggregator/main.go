@@ -20,16 +20,22 @@ func main() {
 	orders.orders.Store(1, 5)
 
 	logger := NewStdOutLogger()
-	aggregator := NewUserAggregator(
+	aggregator, err := NewUserAggregator(
 		profiles,
 		orders,
 		WithLogger(logger),
+		WithTimeout(2*time.Second),
 	)
+	if err != nil {
+		panic(err)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// happy path
 	{
+		fmt.Println("*** HAPPY PATH **")
 		profileId := 1
 		logger.Info("requesting user aggregation",
 			"ProfileId", profileId,
@@ -51,6 +57,7 @@ func main() {
 
 	// unhappy path
 	{
+		fmt.Println("\n*** UNHAPPY PATH (profile not found) **")
 		profileId := -1
 		logger.Info("requesting user aggregation",
 			"ProfileId", profileId,
@@ -80,15 +87,15 @@ func NewStdOutLogger() *slog.Logger {
 }
 
 type UserAggregator struct {
-	profiles *profileService
-	orders   *orderService
+	profiles *ProfileService
+	orders   *OrderService
 	logger   *slog.Logger
 	timeout  time.Duration
 }
 
-type userAggregatorOption func(a *UserAggregator) error
+type UserAggregatorOption func(a *UserAggregator) error
 
-func WithTimeout(t time.Duration) userAggregatorOption {
+func WithTimeout(t time.Duration) UserAggregatorOption {
 	return func(a *UserAggregator) error {
 		if t <= 0 {
 			return errors.New("timeout must be greater than 0")
@@ -99,7 +106,7 @@ func WithTimeout(t time.Duration) userAggregatorOption {
 	}
 }
 
-func WithLogger(logger *slog.Logger) userAggregatorOption {
+func WithLogger(logger *slog.Logger) UserAggregatorOption {
 	return func(a *UserAggregator) error {
 		if logger == nil {
 			return errors.New("logger can't be nil")
@@ -110,11 +117,7 @@ func WithLogger(logger *slog.Logger) userAggregatorOption {
 	}
 }
 
-func NewUserAggregator(
-	profiles *profileService,
-	orders *orderService,
-	options ...userAggregatorOption,
-) *UserAggregator {
+func NewUserAggregator(profiles *ProfileService, orders *OrderService, options ...UserAggregatorOption) (*UserAggregator, error) {
 	aggregator := &UserAggregator{
 		profiles: profiles,
 		orders:   orders,
@@ -122,17 +125,20 @@ func NewUserAggregator(
 		logger:   NewStdOutLogger(),
 	}
 	for _, opt := range options {
-		opt(aggregator)
+		err := opt(aggregator)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return aggregator
+	return aggregator, nil
 }
 
 func (a *UserAggregator) Aggregate(ctx context.Context, id int) (string, error) {
 	var (
 		eg      errgroup.Group
 		cancel  context.CancelFunc
-		profile profile
-		orders  orders
+		profile Profile
+		orders  Orders
 	)
 
 	if a.timeout > 0 {
@@ -177,56 +183,56 @@ func (a *UserAggregator) Aggregate(ctx context.Context, id int) (string, error) 
 	), nil
 }
 
-type profileService struct {
+type ProfileService struct {
 	profiles sync.Map
 }
 
-func NewProfileService() *profileService {
-	return &profileService{
+func NewProfileService() *ProfileService {
+	return &ProfileService{
 		profiles: sync.Map{},
 	}
 }
 
-func (p *profileService) GetProfile(ctx context.Context, id int) (profile, error) {
+func (p *ProfileService) GetProfile(ctx context.Context, id int) (Profile, error) {
 	select {
 	case <-ctx.Done():
-		return profile{}, ctx.Err()
+		return Profile{}, ctx.Err()
 	default:
 	}
 
 	if load, ok := p.profiles.Load(id); ok {
 		if name, ok := load.(string); ok {
-			return profile{name}, nil
+			return Profile{name}, nil
 		}
 	}
-	return profile{}, errors.New("profile not found")
+	return Profile{}, errors.New("profile not found")
 }
 
-type profile struct{ Name string }
+type Profile struct{ Name string }
 
-type orderService struct {
+type OrderService struct {
 	orders sync.Map
 }
 
-func NewOrderService() *orderService {
-	return &orderService{
+func NewOrderService() *OrderService {
+	return &OrderService{
 		orders: sync.Map{},
 	}
 }
 
-func (o *orderService) GetOrders(ctx context.Context, profileId int) (orders, error) {
+func (o *OrderService) GetOrders(ctx context.Context, profileId int) (Orders, error) {
 	select {
 	case <-ctx.Done():
-		return orders{}, ctx.Err()
-	case <-time.After(5 * time.Second):
+		return Orders{}, ctx.Err()
+	case <-time.After(1 * time.Second):
 	}
 
 	if load, ok := o.orders.Load(profileId); ok {
 		if quantity, ok := load.(int); ok {
-			return orders{quantity}, nil
+			return Orders{quantity}, nil
 		}
 	}
-	return orders{}, errors.New("order data not found")
+	return Orders{}, errors.New("order data not found")
 }
 
-type orders struct{ Quantity int }
+type Orders struct{ Quantity int }
