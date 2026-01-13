@@ -14,10 +14,10 @@ import (
 
 func main() {
 	profiles := NewProfileService()
-	profiles.profiles.Store(1, "Alice")
+	profiles.profiles[1] = Profile{Name: "Alice"}
 
 	orders := NewOrderService()
-	orders.orders.Store(1, 5)
+	orders.orders[1] = Orders{Quantity: 5}
 
 	logger := NewStdOutLogger()
 	aggregator, err := NewUserAggregator(
@@ -35,7 +35,7 @@ func main() {
 
 	// happy path
 	{
-		fmt.Println("*** HAPPY PATH **")
+		fmt.Println("*** HAPPY PATH ***")
 		profileId := 1
 		logger.Info("requesting user aggregation",
 			"ProfileId", profileId,
@@ -184,12 +184,14 @@ func (a *UserAggregator) Aggregate(ctx context.Context, id int) (string, error) 
 }
 
 type ProfileService struct {
-	profiles sync.Map
+	profiles map[int]Profile
+	mux      sync.Mutex
 }
 
 func NewProfileService() *ProfileService {
 	return &ProfileService{
-		profiles: sync.Map{},
+		profiles: make(map[int]Profile),
+		mux:      sync.Mutex{},
 	}
 }
 
@@ -200,23 +202,27 @@ func (p *ProfileService) GetProfile(ctx context.Context, id int) (Profile, error
 	default:
 	}
 
-	if load, ok := p.profiles.Load(id); ok {
-		if name, ok := load.(string); ok {
-			return Profile{name}, nil
-		}
+	p.mux.Lock()
+	defer p.mux.Unlock()
+
+	if profile, ok := p.profiles[id]; ok {
+		return profile, nil
 	}
+
 	return Profile{}, errors.New("profile not found")
 }
 
 type Profile struct{ Name string }
 
 type OrderService struct {
-	orders sync.Map
+	orders map[int]Orders
+	mux    sync.Mutex
 }
 
 func NewOrderService() *OrderService {
 	return &OrderService{
-		orders: sync.Map{},
+		orders: make(map[int]Orders),
+		mux:    sync.Mutex{},
 	}
 }
 
@@ -227,10 +233,11 @@ func (o *OrderService) GetOrders(ctx context.Context, profileId int) (Orders, er
 	case <-time.After(1 * time.Second):
 	}
 
-	if load, ok := o.orders.Load(profileId); ok {
-		if quantity, ok := load.(int); ok {
-			return Orders{quantity}, nil
-		}
+	o.mux.Lock()
+	defer o.mux.Unlock()
+
+	if orders, ok := o.orders[profileId]; ok {
+		return orders, nil
 	}
 	return Orders{}, errors.New("order data not found")
 }
