@@ -44,16 +44,36 @@ func TestShardedMapKeys(t *testing.T) {
 
 func TestShardedMapSet(t *testing.T) {
 	t.Parallel()
-	sm, err := NewShardedMap[userId, user]()
-	if err != nil {
-		t.Fatal(err)
+
+	// keys type == int
+	{
+		sm, err := NewShardedMap[userId, user]()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		sm.Set(1, "Alice")
+		sm.Set(2, "Bob")
+
+		keys := sm.Keys()
+		if got := len(keys); got != 2 {
+			t.Fatalf("want 2 keys, got %d", got)
+		}
 	}
 
-	sm.Set(1, "Alice")
-	sm.Set(2, "Bob")
+	// keys type == string
+	{
+		sm, err := NewShardedMap[user, userId]()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	keys := sm.Keys()
-	if got := len(keys); got != 2 {
-		t.Fatalf("want 2 keys, got %d", got)
+		sm.Set("Alice", 1)
+		sm.Set("Bob", 2)
+
+		keys := sm.Keys()
+		if got := len(keys); got != 2 {
+			t.Fatalf("want 2 keys, got %d", got)
+		}
 	}
 }
