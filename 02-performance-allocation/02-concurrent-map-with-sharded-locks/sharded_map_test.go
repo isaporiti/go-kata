@@ -20,6 +20,7 @@ type userId = int
 type user = string
 
 func TestShardedMapCreation(t *testing.T) {
+	t.Parallel()
 	if _, err := NewShardedMap[userId, user](); err != nil {
 		t.Fatal(err)
 	}
@@ -29,6 +30,7 @@ func TestShardedMapCreation(t *testing.T) {
 }
 
 func TestShardedMapKeys(t *testing.T) {
+	t.Parallel()
 	sm, _ := NewShardedMap[userId, user]()
 
 	var keys []userId = sm.Keys()
@@ -38,6 +40,7 @@ func TestShardedMapKeys(t *testing.T) {
 }
 
 func TestShardedMapSet(t *testing.T) {
+	t.Parallel()
 	sm, _ := NewShardedMap[userId, user]()
 
 	sm.Set(1, "Alice")
