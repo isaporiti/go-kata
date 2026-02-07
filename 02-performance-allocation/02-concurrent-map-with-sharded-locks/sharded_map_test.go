@@ -28,6 +28,10 @@ type ShardedMap[K comparable, V any] struct {
 	mutexes []sync.RWMutex
 }
 
+func (s *ShardedMap[K, V]) Keys() []K {
+	return nil
+}
+
 func NewShardedMap[K comparable, V any](options ...ShardedMapOption[K, V]) (*ShardedMap[K, V], error) {
 	sm := &ShardedMap[K, V]{
 		shards:  make([]map[K]V, SHARD_NUMBER),
@@ -64,5 +68,14 @@ func TestShardedMapCreation(t *testing.T) {
 	}
 	if _, err := NewShardedMap(WithNumberOfShards[userId, user](16)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestShardedMapKeys(t *testing.T) {
+	sm, _ := NewShardedMap[userId, user]()
+
+	var keys []userId = sm.Keys()
+	if got := len(keys); got != 0 {
+		t.Fatalf("want 0 keys, got %d", got)
 	}
 }
