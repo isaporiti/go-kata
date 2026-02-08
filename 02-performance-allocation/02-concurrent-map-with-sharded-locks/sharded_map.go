@@ -31,6 +31,31 @@ func NewShardedMap[K comparable, V any](options ...ShardedMapOption[K, V]) (*Sha
 	return sm, nil
 }
 
+func (s *ShardedMap[K, V]) Get(k K) V {
+	var hash uint64
+	switch k := any(k).(type) {
+	case string:
+		fnv := fnv.New64a()
+		fnv.Write([]byte(k))
+		hash = fnv.Sum64()
+
+	case int:
+		hash = uint64(k)
+
+	default:
+		panic("unreachable")
+	}
+
+	i := int(hash % uint64(len(s.shards)))
+
+	mu := &s.mutexes[i]
+	mu.RLock()
+	defer mu.RUnlock()
+
+	m := s.shards[i]
+	return m[k]
+}
+
 func (s *ShardedMap[K, V]) Set(k K, v V) {
 	var hash uint64
 	switch k := any(k).(type) {

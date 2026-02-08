@@ -77,3 +77,43 @@ func TestShardedMapSet(t *testing.T) {
 		}
 	}
 }
+
+func TestShardedMapGet(t *testing.T) {
+	t.Parallel()
+
+	// keys type == int
+	{
+		sm, err := NewShardedMap[userId, user]()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		sm.Set(1, "Alice")
+		sm.Set(2, "Bob")
+
+		if got := sm.Get(1); got != "Alice" {
+			t.Fatalf(`want "Alice", got %q`, got)
+		}
+		if got := sm.Get(2); got != "Bob" {
+			t.Fatalf(`want "Bob", got %q`, got)
+		}
+	}
+
+	// keys type == string
+	{
+		sm, err := NewShardedMap[user, userId]()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		sm.Set("Alice", 1)
+		sm.Set("Bob", 2)
+
+		if got := sm.Get("Alice"); got != 1 {
+			t.Fatalf(`want 1, got %d`, got)
+		}
+		if got := sm.Get("Bob"); got != 2 {
+			t.Fatalf(`want 2, got %d`, got)
+		}
+	}
+}
