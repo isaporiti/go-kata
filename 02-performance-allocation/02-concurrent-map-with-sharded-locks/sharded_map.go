@@ -32,21 +32,7 @@ func NewShardedMap[K comparable, V any](options ...ShardedMapOption[K, V]) (*Sha
 }
 
 func (s *ShardedMap[K, V]) Get(k K) V {
-	var hash uint64
-	switch k := any(k).(type) {
-	case string:
-		fnv := fnv.New64a()
-		fnv.Write([]byte(k))
-		hash = fnv.Sum64()
-
-	case int:
-		hash = uint64(k)
-
-	default:
-		panic("unreachable")
-	}
-
-	i := int(hash % uint64(len(s.shards)))
+	i := s.getIndex(k)
 
 	mu := &s.mutexes[i]
 	mu.RLock()
@@ -57,6 +43,17 @@ func (s *ShardedMap[K, V]) Get(k K) V {
 }
 
 func (s *ShardedMap[K, V]) Set(k K, v V) {
+	i := s.getIndex(k)
+
+	mu := &s.mutexes[i]
+	mu.Lock()
+	defer mu.Unlock()
+
+	m := s.shards[i]
+	m[k] = v
+}
+
+func (s *ShardedMap[K, V]) getIndex(k K) int {
 	var hash uint64
 	switch k := any(k).(type) {
 	case string:
@@ -71,14 +68,7 @@ func (s *ShardedMap[K, V]) Set(k K, v V) {
 		panic("unreachable")
 	}
 
-	i := int(hash % uint64(len(s.shards)))
-
-	mu := &s.mutexes[i]
-	mu.Lock()
-	defer mu.Unlock()
-
-	m := s.shards[i]
-	m[k] = v
+	return int(hash % uint64(len(s.shards)))
 }
 
 func (s *ShardedMap[K, V]) Keys() []K {
