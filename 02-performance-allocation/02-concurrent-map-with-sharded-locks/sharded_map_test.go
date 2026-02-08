@@ -59,6 +59,12 @@ func TestShardedMapSet(t *testing.T) {
 		if got := len(keys); got != 2 {
 			t.Fatalf("want 2 keys, got %d", got)
 		}
+
+		sm.Set(2, "Foo")
+		if got := sm.Get(2); got != "Foo" {
+			t.Fatalf(`want "Foo", got %q`, got)
+
+		}
 	}
 
 	// keys type == string
@@ -74,6 +80,11 @@ func TestShardedMapSet(t *testing.T) {
 		keys := sm.Keys()
 		if got := len(keys); got != 2 {
 			t.Fatalf("want 2 keys, got %d", got)
+		}
+
+		sm.Set("Alice", 3)
+		if got := sm.Get("Alice"); got != 3 {
+			t.Fatalf("want 3, got %d", got)
 		}
 	}
 }
