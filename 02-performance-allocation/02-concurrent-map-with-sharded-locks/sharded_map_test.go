@@ -128,3 +128,63 @@ func TestShardedMapGet(t *testing.T) {
 		}
 	}
 }
+
+func TestShardedMapDelete(t *testing.T) {
+	t.Parallel()
+
+	// keys type == int
+	{
+		sm, err := NewShardedMap[userId, user]()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		sm.Set(1, "Alice")
+		sm.Set(2, "Bob")
+		sm.Delete(3)
+
+		if got := len(sm.Keys()); got != 2 {
+			t.Fatalf("want 2 keys, got %d", got)
+		}
+
+		sm.Delete(1)
+
+		if got := len(sm.Keys()); got != 1 {
+			t.Fatalf("want 1 key, got %d", got)
+		}
+		if got := sm.Get(1); got == "Alice" {
+			t.Fatal(`"1: Alice" did not get deleted`)
+		}
+		if got := sm.Get(2); got != "Bob" {
+			t.Fatal(`"2: Bob" is missing`)
+		}
+	}
+
+	// keys type == string
+	{
+		sm, err := NewShardedMap[user, userId]()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		sm.Set("Alice", 1)
+		sm.Set("Bob", 2)
+		sm.Delete("Foo")
+
+		if got := len(sm.Keys()); got != 2 {
+			t.Fatalf("want 2 keys, got %d", got)
+		}
+
+		sm.Delete("Alice")
+
+		if got := len(sm.Keys()); got != 1 {
+			t.Fatalf("want 1 key, got %d", got)
+		}
+		if got := sm.Get("Alice"); got == 1 {
+			t.Fatal(`"Alice: 1" did not get deleted`)
+		}
+		if got := sm.Get("Bob"); got != 2 {
+			t.Fatal(`"Bob: 2" is missing`)
+		}
+	}
+}

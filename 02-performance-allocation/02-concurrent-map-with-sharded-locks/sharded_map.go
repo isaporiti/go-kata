@@ -53,6 +53,17 @@ func (s *ShardedMap[K, V]) Set(k K, v V) {
 	m[k] = v
 }
 
+func (s *ShardedMap[K, V]) Delete(k K) {
+	i := s.getIndex(k)
+
+	mu := &s.mutexes[i]
+	mu.Lock()
+	defer mu.Unlock()
+
+	m := s.shards[i]
+	delete(m, k)
+}
+
 func (s *ShardedMap[K, V]) getIndex(k K) int {
 	var hash uint64
 	switch k := any(k).(type) {
