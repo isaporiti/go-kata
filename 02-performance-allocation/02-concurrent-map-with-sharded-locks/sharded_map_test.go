@@ -221,3 +221,36 @@ func BenchmarkSet_1Shard(b *testing.B) {
 func BenchmarkSet_64Shards(b *testing.B) {
 	benchmarkSet(b, 64)
 }
+
+func TestShardedMap_Race(t *testing.T) {
+	sm, err := NewShardedMap[int, int]()
+	if err != nil {
+		t.Fatalf("failed to create sharded map: %v", err)
+	}
+
+	const (
+		numGoroutines = 8
+		numOps        = 10_000
+	)
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+
+	for g := range numGoroutines {
+		go func(g int) {
+			defer wg.Done()
+			for i := range numOps {
+				key := (g * numOps) + i
+
+				switch i % 3 {
+				case 0:
+					sm.Set(key, key)
+				case 1:
+					sm.Get(key)
+				case 2:
+					sm.Delete(key)
+				}
+			}
+		}(g)
+	}
+	wg.Wait()
+}
