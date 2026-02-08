@@ -1,6 +1,7 @@
 package sharded_map
 
 import (
+	"runtime"
 	"strconv"
 	"sync"
 	"testing"
@@ -253,4 +254,45 @@ func TestShardedMap_Race(t *testing.T) {
 		}(g)
 	}
 	wg.Wait()
+}
+
+func TestMemory_Overhead(t *testing.T) {
+	const (
+		n          = 1_000_000
+		maxExtraMB = 50.0
+	)
+
+	measure := func(fillMap func()) uint64 {
+		var m runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&m)
+		before := m.Alloc
+
+		fillMap()
+
+		runtime.GC()
+		runtime.ReadMemStats(&m)
+		return m.Alloc - before
+	}
+
+	baseUsed := measure(func() {
+		m := make(map[int]any, n)
+		for i := range n {
+			m[i] = i
+		}
+	})
+
+	shardedUsed := measure(func() {
+		sm, _ := NewShardedMap[int, any]()
+		for i := range n {
+			sm.Set(i, i)
+		}
+	})
+
+	diffBytes := int64(shardedUsed) - int64(baseUsed)
+	diffMB := float64(diffBytes) / 1024 / 1024
+
+	if diffMB > maxExtraMB {
+		t.Fatalf("memory overhead too high: %.2f MB > %.2f MB", diffMB, maxExtraMB)
+	}
 }
