@@ -1,6 +1,8 @@
 package sharded_map
 
 import (
+	"strconv"
+	"sync"
 	"testing"
 )
 
@@ -187,4 +189,35 @@ func TestShardedMapDelete(t *testing.T) {
 			t.Fatal(`"Bob: 2" is missing`)
 		}
 	}
+}
+
+func benchmarkSet(b *testing.B, shards int8) {
+	sm, err := NewShardedMap(
+		WithNumberOfShards[int, string](shards),
+	)
+	if err != nil {
+		b.Fatalf("failed to create sharded map: %v", err)
+	}
+
+	const numGoroutines = 8
+	var wg sync.WaitGroup
+	b.ResetTimer()
+	for i := range numGoroutines {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			for j := i; j < b.N; j += numGoroutines {
+				sm.Set(j, strconv.Itoa(j))
+			}
+		}(i)
+	}
+	wg.Wait()
+}
+
+func BenchmarkSet_1Shard(b *testing.B) {
+	benchmarkSet(b, 1)
+}
+
+func BenchmarkSet_64Shards(b *testing.B) {
+	benchmarkSet(b, 64)
 }
