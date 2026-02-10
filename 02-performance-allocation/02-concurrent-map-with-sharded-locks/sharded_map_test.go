@@ -1,22 +1,12 @@
 package sharded_map
 
 import (
+	"errors"
 	"runtime"
 	"strconv"
 	"sync"
 	"testing"
 )
-
-// ## 🛠 The Challenge
-// Implement `ShardedMap[K comparable, V any]` with configurable shard count that provides safe concurrent access.
-
-// ### 1. Functional Requirements
-// * [ ] Type-safe generic implementation (Go 1.18+)
-// * [ ] `Get(key K) (V, bool)` - returns value and existence flag
-// * [ ] `Set(key K, value V)` - inserts or updates
-// * [ ] `Delete(key K)` - removes key
-// * [ ] `Keys() []K` - returns all keys (order doesn't matter)
-// * [x] Configurable number of shards at construction
 
 type userId = int
 
@@ -29,6 +19,12 @@ func TestShardedMapCreation(t *testing.T) {
 	}
 	if _, err := NewShardedMap(WithNumberOfShards[userId, user](16)); err != nil {
 		t.Fatal(err)
+	}
+	if _, err := NewShardedMap(WithNumberOfShards[userId, user](0)); !errors.Is(err, ErrNumberOfShards) {
+		t.Fatalf("wanted ErrNumberOfShards, got %s", err)
+	}
+	if _, err := NewShardedMap(WithNumberOfShards[userId, user](-8)); !errors.Is(err, ErrNumberOfShards) {
+		t.Fatalf("wanted ErrNumberOfShards, got %s", err)
 	}
 }
 

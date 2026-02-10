@@ -25,7 +25,7 @@ func NewShardedMap[K comparable, V any](options ...ShardedMapOption[K, V]) (*Sha
 
 	for _, opt := range options {
 		if err := opt(sm); err != nil {
-			return nil, fmt.Errorf("can't create ShardedMap: %v", err)
+			return nil, fmt.Errorf("can't create ShardedMap: %w", err)
 		}
 	}
 	return sm, nil
@@ -97,10 +97,12 @@ func (s *ShardedMap[K, V]) Keys() []K {
 
 type ShardedMapOption[K comparable, V any] func(sm *ShardedMap[K, V]) error
 
+var ErrNumberOfShards = errors.New("number of shards must be greater than zero")
+
 func WithNumberOfShards[K comparable, V any](n int8) ShardedMapOption[K, V] {
 	return func(sm *ShardedMap[K, V]) error {
 		if n <= 0 {
-			return errors.New("number of shards must be greater than zero")
+			return ErrNumberOfShards
 		}
 		if n == int8(len(sm.shards)) {
 			return nil
